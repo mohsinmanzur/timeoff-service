@@ -3,8 +3,16 @@ import { HttpService } from '@nestjs/axios';
 import { ConfigService } from '@nestjs/config';
 import { lastValueFrom } from 'rxjs';
 import { AxiosError } from 'axios';
-import { HcmBalanceDto, HcmDeductResponseDto, HcmBatchPayloadDto } from './dto/hcm.dto';
-import { HcmApiException, HcmInsufficientBalanceException, HcmInvalidDimensionException } from './exceptions/hcm.exceptions';
+import {
+  HcmBalanceDto,
+  HcmDeductResponseDto,
+  HcmBatchPayloadDto,
+} from './dto/hcm.dto';
+import {
+  HcmApiException,
+  HcmInsufficientBalanceException,
+  HcmInvalidDimensionException,
+} from './exceptions/hcm.exceptions';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { LeaveBalance } from '../leave/entities';
@@ -21,23 +29,29 @@ export class HcmClientService {
     private readonly leaveBalanceRepo: Repository<LeaveBalance>,
   ) {
     this.baseUrl = this.configService.get<string>('HCM_BASE_URL', '');
-    
+
     // Axios interceptors for logging
     const axios = this.httpService.axiosRef;
     axios.interceptors.request.use((config) => {
-      this.logger.debug(`Outbound Request: ${config.method?.toUpperCase()} ${config.url}`);
+      this.logger.debug(
+        `Outbound Request: ${config.method?.toUpperCase()} ${config.url}`,
+      );
       return config;
     });
-    
+
     axios.interceptors.response.use(
       (response) => {
-        this.logger.debug(`Inbound Response: ${response.status} from ${response.config.url}`);
+        this.logger.debug(
+          `Inbound Response: ${response.status} from ${response.config.url}`,
+        );
         return response;
       },
       (error: AxiosError) => {
-        this.logger.debug(`Inbound Error: ${error.response?.status || error.message} from ${error.config?.url}`);
+        this.logger.debug(
+          `Inbound Error: ${error.response?.status || error.message} from ${error.config?.url}`,
+        );
         return Promise.reject(error);
-      }
+      },
     );
   }
 
@@ -57,8 +71,10 @@ export class HcmClientService {
         attempt++;
         if (this.isNetworkError(error) && attempt <= maxRetries) {
           const delay = Math.pow(2, attempt) * 500; // Exponential backoff
-          this.logger.debug(`Network error. Retrying attempt ${attempt} in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
+          this.logger.debug(
+            `Network error. Retrying attempt ${attempt} in ${delay}ms...`,
+          );
+          await new Promise((resolve) => setTimeout(resolve, delay));
           continue;
         }
         throw error;
@@ -67,17 +83,23 @@ export class HcmClientService {
   }
 
   private isNetworkError(error: any): boolean {
-    return (error instanceof AxiosError) && (!error.response || error.response.status >= 500);
+    return (
+      error instanceof AxiosError &&
+      (!error.response || error.response.status >= 500)
+    );
   }
 
-  async getBalance(employeeId: string, locationId: string): Promise<HcmBalanceDto> {
+  async getBalance(
+    employeeId: string,
+    locationId: string,
+  ): Promise<HcmBalanceDto> {
     try {
       return await this.requestWithRetry(async () => {
         const response = await lastValueFrom(
           this.httpService.get<HcmBalanceDto>(`${this.baseUrl}/balances`, {
             headers: this.headers,
             params: { employeeId, locationId },
-          })
+          }),
         );
         return response.data;
       });
@@ -86,15 +108,20 @@ export class HcmClientService {
     }
   }
 
-  async deductBalance(employeeId: string, locationId: string, days: number, requestId: string): Promise<HcmDeductResponseDto> {
+  async deductBalance(
+    employeeId: string,
+    locationId: string,
+    days: number,
+    requestId: string,
+  ): Promise<HcmDeductResponseDto> {
     try {
       return await this.requestWithRetry(async () => {
         const response = await lastValueFrom(
           this.httpService.post<HcmDeductResponseDto>(
             `${this.baseUrl}/balances/deduct`,
             { employeeId, locationId, days, requestId },
-            { headers: this.headers }
-          )
+            { headers: this.headers },
+          ),
         );
         return response.data;
       });
@@ -103,15 +130,20 @@ export class HcmClientService {
     }
   }
 
-  async restoreBalance(employeeId: string, locationId: string, days: number, requestId: string): Promise<void> {
+  async restoreBalance(
+    employeeId: string,
+    locationId: string,
+    days: number,
+    requestId: string,
+  ): Promise<void> {
     try {
       await this.requestWithRetry(async () => {
         await lastValueFrom(
           this.httpService.post(
             `${this.baseUrl}/balances/restore`,
             { employeeId, locationId, days, requestId },
-            { headers: this.headers }
-          )
+            { headers: this.headers },
+          ),
         );
       });
     } catch (error) {
@@ -121,12 +153,17 @@ export class HcmClientService {
 
   async ingestBatch(payload: HcmBatchPayloadDto[]): Promise<void> {
     for (const record of payload) {
-      const balance = await this.leaveBalanceRepo.findOne({
-        where: { employeeId: record.employeeId, locationId: record.locationId }
-      }) || this.leaveBalanceRepo.create({
-        employeeId: record.employeeId,
-        locationId: record.locationId,
-      });
+      const balance =
+        (await this.leaveBalanceRepo.findOne({
+          where: {
+            employeeId: record.employeeId,
+            locationId: record.locationId,
+          },
+        })) ||
+        this.leaveBalanceRepo.create({
+          employeeId: record.employeeId,
+          locationId: record.locationId,
+        });
 
       balance.totalDays = record.availableDays + record.usedDays;
       balance.usedDays = record.usedDays;
@@ -135,17 +172,31 @@ export class HcmClientService {
     }
   }
 
-  private handleHcmError(error: any): never {
-    const response = (error instanceof AxiosError) ? error.response : null;
+  private handleHcmError(error: unknown): never {
+    const axiosError = error instanceof AxiosError ? error : null;
+    const response = axiosError?.response ?? null;
     if (response && response.status >= 400 && response.status < 500) {
-      const errorCode = response.data?.code || response.data?.error;
+      const data = response.data as {
+        code?: string;
+        error?: string;
+        message?: string;
+      };
+      const errorCode = data?.code || data?.error;
       if (errorCode === 'INSUFFICIENT_BALANCE') {
-        throw new HcmInsufficientBalanceException(response.data?.message || 'Insufficient balance');
+        throw new HcmInsufficientBalanceException(
+          data?.message || 'Insufficient balance',
+        );
       }
       if (errorCode === 'INVALID_DIMENSION') {
-        throw new HcmInvalidDimensionException(response.data?.message || 'Invalid dimension');
+        throw new HcmInvalidDimensionException(
+          data?.message || 'Invalid dimension',
+        );
       }
-      throw new HcmApiException(error.message, response.status, response.data);
+      throw new HcmApiException(
+        axiosError!.message,
+        response.status,
+        response.data,
+      );
     }
     throw error;
   }

@@ -1,6 +1,9 @@
 import { DataSource, Repository, QueryRunner } from 'typeorm';
 import { LeaveBalance } from '../../src/modules/leave/entities/leave-balance.entity';
-import { TimeOffRequest, RequestStatus } from '../../src/modules/leave/entities/time-off-request.entity';
+import {
+  TimeOffRequest,
+  RequestStatus,
+} from '../../src/modules/leave/entities/time-off-request.entity';
 
 // ─── Test DataSource ──────────────────────────────────────────────────────────
 
@@ -64,7 +67,10 @@ describe('Database Layer — Integration Tests', () => {
       await seedBalance(balanceRepo);
 
       await expect(
-        seedBalance(balanceRepo, { employeeId: 'EMP-001', locationId: 'LOC-NYC' }),
+        seedBalance(balanceRepo, {
+          employeeId: 'EMP-001',
+          locationId: 'LOC-NYC',
+        }),
       ).rejects.toThrow(); // SQLITE_CONSTRAINT
     });
 
@@ -125,7 +131,8 @@ describe('Database Layer — Integration Tests', () => {
       });
 
       const fresh = await balanceRepo.findOne({ where: { id: balance.id } });
-      const availableDays = fresh!.totalDays - fresh!.usedDays - fresh!.pendingDays;
+      const availableDays =
+        fresh!.totalDays - fresh!.usedDays - fresh!.pendingDays;
       expect(availableDays).toBe(12);
     });
 
@@ -137,7 +144,8 @@ describe('Database Layer — Integration Tests', () => {
       });
 
       const fresh = await balanceRepo.findOne({ where: { id: balance.id } });
-      const availableDays = fresh!.totalDays - fresh!.usedDays - fresh!.pendingDays;
+      const availableDays =
+        fresh!.totalDays - fresh!.usedDays - fresh!.pendingDays;
       expect(availableDays).toBe(0);
     });
   });
@@ -146,7 +154,11 @@ describe('Database Layer — Integration Tests', () => {
 
   describe('Concurrent pending updates (simulated sequential)', () => {
     it('two sequential requestTimeOff calls do not over-commit', async () => {
-      await seedBalance(balanceRepo, { totalDays: 10, usedDays: 0, pendingDays: 0 });
+      await seedBalance(balanceRepo, {
+        totalDays: 10,
+        usedDays: 0,
+        pendingDays: 0,
+      });
 
       // Simulate first request: attempt to reserve 7 days
       const transaction1 = async (): Promise<void> => {
@@ -211,15 +223,48 @@ describe('Database Layer — Integration Tests', () => {
     it('updates all 3 LeaveBalance records from a batch payload', async () => {
       // Pre-seed 3 employees
       await Promise.all([
-        seedBalance(balanceRepo, { employeeId: 'EMP-A', locationId: 'LOC-NYC', totalDays: 10, usedDays: 0, pendingDays: 0 }),
-        seedBalance(balanceRepo, { employeeId: 'EMP-B', locationId: 'LOC-NYC', totalDays: 10, usedDays: 0, pendingDays: 0 }),
-        seedBalance(balanceRepo, { employeeId: 'EMP-C', locationId: 'LOC-NYC', totalDays: 10, usedDays: 0, pendingDays: 0 }),
+        seedBalance(balanceRepo, {
+          employeeId: 'EMP-A',
+          locationId: 'LOC-NYC',
+          totalDays: 10,
+          usedDays: 0,
+          pendingDays: 0,
+        }),
+        seedBalance(balanceRepo, {
+          employeeId: 'EMP-B',
+          locationId: 'LOC-NYC',
+          totalDays: 10,
+          usedDays: 0,
+          pendingDays: 0,
+        }),
+        seedBalance(balanceRepo, {
+          employeeId: 'EMP-C',
+          locationId: 'LOC-NYC',
+          totalDays: 10,
+          usedDays: 0,
+          pendingDays: 0,
+        }),
       ]);
 
       const batchPayload = [
-        { employeeId: 'EMP-A', locationId: 'LOC-NYC', availableDays: 18, usedDays: 2 },
-        { employeeId: 'EMP-B', locationId: 'LOC-NYC', availableDays: 15, usedDays: 5 },
-        { employeeId: 'EMP-C', locationId: 'LOC-NYC', availableDays: 12, usedDays: 8 },
+        {
+          employeeId: 'EMP-A',
+          locationId: 'LOC-NYC',
+          availableDays: 18,
+          usedDays: 2,
+        },
+        {
+          employeeId: 'EMP-B',
+          locationId: 'LOC-NYC',
+          availableDays: 15,
+          usedDays: 5,
+        },
+        {
+          employeeId: 'EMP-C',
+          locationId: 'LOC-NYC',
+          availableDays: 12,
+          usedDays: 8,
+        },
       ];
 
       // Simulate ingestBatch logic directly on the DB
@@ -234,9 +279,15 @@ describe('Database Layer — Integration Tests', () => {
       }
 
       const [a, b, c] = await Promise.all([
-        balanceRepo.findOne({ where: { employeeId: 'EMP-A', locationId: 'LOC-NYC' } }),
-        balanceRepo.findOne({ where: { employeeId: 'EMP-B', locationId: 'LOC-NYC' } }),
-        balanceRepo.findOne({ where: { employeeId: 'EMP-C', locationId: 'LOC-NYC' } }),
+        balanceRepo.findOne({
+          where: { employeeId: 'EMP-A', locationId: 'LOC-NYC' },
+        }),
+        balanceRepo.findOne({
+          where: { employeeId: 'EMP-B', locationId: 'LOC-NYC' },
+        }),
+        balanceRepo.findOne({
+          where: { employeeId: 'EMP-C', locationId: 'LOC-NYC' },
+        }),
       ]);
 
       expect(a!.totalDays).toBe(20);
@@ -256,7 +307,12 @@ describe('Database Layer — Integration Tests', () => {
 
     it('creates a new row for an unknown employee in the batch', async () => {
       const batchPayload = [
-        { employeeId: 'EMP-NEW', locationId: 'LOC-NYC', availableDays: 25, usedDays: 0 },
+        {
+          employeeId: 'EMP-NEW',
+          locationId: 'LOC-NYC',
+          availableDays: 25,
+          usedDays: 0,
+        },
       ];
 
       for (const item of batchPayload) {
@@ -302,7 +358,9 @@ describe('Database Layer — Integration Tests', () => {
       await balanceRepo.save(balance);
 
       const updated = await balanceRepo.findOne({ where: { id: balance.id } });
-      expect(updated!.lastSyncedAt.getTime()).toBeGreaterThanOrEqual(syncedAt.getTime() - 100);
+      expect(updated!.lastSyncedAt.getTime()).toBeGreaterThanOrEqual(
+        syncedAt.getTime() - 100,
+      );
       expect(updated!.totalDays).toBe(25);
     });
 

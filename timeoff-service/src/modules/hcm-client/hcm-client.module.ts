@@ -9,7 +9,7 @@ import { LeaveBalance } from '../leave/entities';
   imports: [
     HttpModule.registerAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         timeout: configService.get<number>('HCM_TIMEOUT', 5000),
       }),
       inject: [ConfigService],

@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
@@ -14,7 +16,15 @@ describe('AppController (e2e)', () => {
   let app: INestApplication<App>;
   let mockServer: Server;
   let dataSource: DataSource;
-  let mockBalances: Record<string, { employeeId: string, locationId: string, totalDays: number, usedDays: number }> = {};
+  let mockBalances: Record<
+    string,
+    {
+      employeeId: string;
+      locationId: string;
+      totalDays: number;
+      usedDays: number;
+    }
+  > = {};
   let mockRequests: string[] = [];
 
   beforeAll((done) => {
@@ -23,8 +33,24 @@ describe('AppController (e2e)', () => {
 
     mockApp.post('/admin/reset', (req, res) => {
       mockBalances = {
-        'EMP-001_LOC-1': { employeeId: 'EMP-001', locationId: 'LOC-1', totalDays: 20, usedDays: 5 },
-        'EMP-002_LOC-1': { employeeId: 'EMP-002', locationId: 'LOC-1', totalDays: 10, usedDays: 0 },
+        'EMP-001_LOC-1': {
+          employeeId: 'EMP-001',
+          locationId: 'LOC-1',
+          totalDays: 20,
+          usedDays: 5,
+        },
+        'EMP-002_LOC-1': {
+          employeeId: 'EMP-002',
+          locationId: 'LOC-1',
+          totalDays: 10,
+          usedDays: 0,
+        },
+        'EMP-NO-BAL_LOC-1': {
+          employeeId: 'EMP-NO-BAL',
+          locationId: 'LOC-1',
+          totalDays: 10,
+          usedDays: 0,
+        },
       };
       mockRequests = [];
       forcedErrors = {};
@@ -44,10 +70,16 @@ describe('AppController (e2e)', () => {
       res.json(mockBalances);
     });
 
-    let forcedErrors: Record<string, { status?: number, code?: string, type?: string }> = {};
+    let forcedErrors: Record<
+      string,
+      { status?: number; code?: string; type?: string }
+    > = {};
     mockApp.post('/admin/set-hcm-error', (req, res) => {
       const { employeeId, locationId, status, code, type } = req.body;
-      forcedErrors[`${employeeId}_${locationId}_${type || 'DEDUCT'}`] = { status, code };
+      forcedErrors[`${employeeId}_${locationId}_${type || 'DEDUCT'}`] = {
+        status,
+        code,
+      };
       res.sendStatus(200);
     });
 
@@ -56,14 +88,24 @@ describe('AppController (e2e)', () => {
       const locationId = req.query.locationId as string;
       const error = forcedErrors[`${employeeId}_${locationId}_GET`];
       if (error) {
-        return res.status(error.status || 400).send({ code: error.code, message: 'Forced error' });
+        return res
+          .status(error.status || 400)
+          .send({ code: error.code, message: 'Forced error' });
       }
 
-      if (req.headers['simulate_error'] || req.query.locationId === 'LOC-ERROR') {
+      if (
+        req.headers['simulate_error'] ||
+        req.query.locationId === 'LOC-ERROR'
+      ) {
         return res.status(502).send({ message: 'Bad Gateway' });
       }
       const key = `${employeeId}_${locationId}`;
-      const balance = mockBalances[key] || { employeeId, locationId, totalDays: 0, usedDays: 0 };
+      const balance = mockBalances[key] || {
+        employeeId,
+        locationId,
+        totalDays: 0,
+        usedDays: 0,
+      };
       res.json(balance);
     });
 
@@ -72,16 +114,26 @@ describe('AppController (e2e)', () => {
       const errorKey = `${employeeId}_${locationId}_DEDUCT`;
       const error = forcedErrors[errorKey];
       if (error) {
-        return res.status(error.status || 400).send({ code: error.code, message: 'Forced error' });
+        return res
+          .status(error.status || 400)
+          .send({ code: error.code, message: 'Forced error' });
       }
 
       if (req.headers['simulate_error']) {
         return res.status(502).send({ message: 'Bad Gateway' });
       }
       const key = `${employeeId}_${locationId}`;
-      const balance = mockBalances[key] || { employeeId, locationId, totalDays: 100, usedDays: 0 };
-      if ((balance.totalDays - balance.usedDays) < days) {
-        return res.status(400).send({ code: 'INSUFFICIENT_BALANCE', message: 'Insufficient balance' });
+      const balance = mockBalances[key] || {
+        employeeId,
+        locationId,
+        totalDays: 100,
+        usedDays: 0,
+      };
+      if (balance.totalDays - balance.usedDays < days) {
+        return res.status(400).send({
+          code: 'INSUFFICIENT_BALANCE',
+          message: 'Insufficient balance',
+        });
       }
       balance.usedDays += days;
       mockRequests.push(requestId);
@@ -89,10 +141,12 @@ describe('AppController (e2e)', () => {
     });
 
     mockApp.post('/balances/restore', (req, res) => {
-      const { employeeId, locationId, days, requestId } = req.body;
+      const { employeeId, locationId, days } = req.body;
       const error = forcedErrors[`${employeeId}_${locationId}_RESTORE`];
       if (error) {
-        return res.status(error.status || 500).send({ message: 'Forced error' });
+        return res
+          .status(error.status || 500)
+          .send({ message: 'Forced error' });
       }
 
       if (req.headers['simulate_error']) {
@@ -127,7 +181,7 @@ describe('AppController (e2e)', () => {
     }).compile();
 
     app = moduleFixture.createNestApplication();
-    
+
     app.useGlobalPipes(
       new ValidationPipe({
         whitelist: true,
@@ -136,9 +190,9 @@ describe('AppController (e2e)', () => {
       }),
     );
     app.useGlobalFilters(new GlobalExceptionFilter());
-    
+
     await app.init();
-    
+
     dataSource = app.get(DataSource);
   });
 
@@ -159,7 +213,7 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     const reqId = createRes.body.id;
     expect(createRes.body.status).toBe('PENDING');
 
@@ -174,7 +228,7 @@ describe('AppController (e2e)', () => {
       .get('/leave/balances')
       .query({ employeeId: 'EMP-001', locationId: 'LOC-1' })
       .expect(200);
-      
+
     // total 20, used initially 5. We requested 5. So used should be 10.
     // available should be 20 - 10 - 0 = 10
     expect(balRes.body.usedDays).toBe(10);
@@ -194,7 +248,7 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     const reqId = createRes.body.id;
 
     await request(app.getHttpServer())
@@ -207,11 +261,11 @@ describe('AppController (e2e)', () => {
       .get('/leave/balances')
       .query({ employeeId: 'EMP-001', locationId: 'LOC-1' })
       .expect(200);
-      
+
     expect(balRes.body.usedDays).toBe(5);
     expect(balRes.body.pendingDays).toBe(0);
     expect(balRes.body.availableDays).toBe(15);
-    
+
     // Check mock admin state
     const mockStateRes = await request(mockServer).get('/admin/state');
     expect(mockStateRes.body['EMP-001_LOC-1'].usedDays).toBe(5);
@@ -229,7 +283,7 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     const reqId = createRes.body.id;
 
     await request(app.getHttpServer())
@@ -241,7 +295,7 @@ describe('AppController (e2e)', () => {
       .get('/leave/balances')
       .query({ employeeId: 'EMP-001', locationId: 'LOC-1' })
       .expect(200);
-      
+
     expect(balRes.body.pendingDays).toBe(0);
     expect(balRes.body.usedDays).toBe(5);
   });
@@ -259,7 +313,7 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-002',
       })
       .expect(201);
-      
+
     // Second request asks for 5, exceeding remaining 4
     await request(app.getHttpServer())
       .post('/leave/requests')
@@ -307,9 +361,19 @@ describe('AppController (e2e)', () => {
       .post('/leave/balances/batch')
       .send({
         items: [
-          { employeeId: 'EMP-001', locationId: 'LOC-1', totalDays: 30, usedDays: 10 },
-          { employeeId: 'EMP-002', locationId: 'LOC-1', totalDays: 15, usedDays: 2 }
-        ]
+          {
+            employeeId: 'EMP-001',
+            locationId: 'LOC-1',
+            totalDays: 30,
+            usedDays: 10,
+          },
+          {
+            employeeId: 'EMP-002',
+            locationId: 'LOC-1',
+            totalDays: 15,
+            usedDays: 2,
+          },
+        ],
       })
       .expect(201);
 
@@ -341,14 +405,14 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     expect(res.body.status).toBe('PENDING');
 
     const balRes = await request(app.getHttpServer())
       .get('/leave/balances')
       .query({ employeeId: 'EMP-001', locationId: 'LOC-1' })
       .expect(200);
-      
+
     // pendingDays should be 5, not rolled back
     expect(balRes.body.pendingDays).toBe(5);
   });
@@ -379,7 +443,7 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     await request(app.getHttpServer())
       .post('/leave/requests')
       .send({
@@ -396,16 +460,14 @@ describe('AppController (e2e)', () => {
       .get('/leave/requests')
       .query({ employeeId: 'EMP-001' })
       .expect(200);
-      
+
     expect(listRes.body.length).toBe(1);
     expect(listRes.body[0].employeeId).toBe('EMP-001');
   });
 
-  it('10. Health check: GET /health returns 200 { status: \'ok\' }', async () => {
-    const res = await request(app.getHttpServer())
-      .get('/health')
-      .expect(200);
-      
+  it("10. Health check: GET /health returns 200 { status: 'ok' }", async () => {
+    const res = await request(app.getHttpServer()).get('/health').expect(200);
+
     expect(res.body.status).toBe('ok');
     expect(res.body.timestamp).toBeDefined();
   });
@@ -422,7 +484,7 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     const reqId = createRes.body.id;
 
     await request(app.getHttpServer())
@@ -449,7 +511,7 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     const reqId = createRes.body.id;
 
     await request(app.getHttpServer())
@@ -470,13 +532,13 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     const reqId = createRes.body.id;
 
     const res = await request(app.getHttpServer())
       .get(`/leave/requests/${reqId}`)
       .expect(200);
-      
+
     expect(res.body.id).toBe(reqId);
   });
 
@@ -507,7 +569,7 @@ describe('AppController (e2e)', () => {
         requestedBy: 'EMP-001',
       })
       .expect(201);
-      
+
     const reqId = createRes.body.id;
 
     // The mock HCM now has total 20, used 7 (5 initial + 2 deducted). Available = 13.
@@ -536,7 +598,7 @@ describe('AppController (e2e)', () => {
       .get('/leave/balances')
       .query({ employeeId: 'EMP-001', locationId: 'LOC-1' })
       .expect(200);
-      
+
     expect(balRes.body.pendingDays).toBe(0);
     // Note: Local usedDays will be 7 (5 initial + 2 approved)
     expect(balRes.body.usedDays).toBe(7);
@@ -631,7 +693,12 @@ describe('AppController (e2e)', () => {
     // Set HCM error to INVALID_DIMENSION
     await request(mockServer)
       .post('/admin/set-hcm-error')
-      .send({ employeeId, locationId, code: 'INVALID_DIMENSION', type: 'DEDUCT' })
+      .send({
+        employeeId,
+        locationId,
+        code: 'INVALID_DIMENSION',
+        type: 'DEDUCT',
+      })
       .expect(200);
 
     await request(app.getHttpServer())
@@ -644,7 +711,7 @@ describe('AppController (e2e)', () => {
         daysRequested: 1,
         requestedBy: 'EMP-DIM-ERROR',
       })
-      .expect(400); 
+      .expect(400);
   });
 
   it('22. HCM Error: Insufficient Balance from HCM during deduct', async () => {
@@ -652,14 +719,25 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer())
       .post('/leave/balances/batch')
       .send({
-        items: [{ employeeId: 'EMP-HCM-INS', locationId: 'LOC-1', totalDays: 10, usedDays: 0 }]
+        items: [
+          {
+            employeeId: 'EMP-HCM-INS',
+            locationId: 'LOC-1',
+            totalDays: 10,
+            usedDays: 0,
+          },
+        ],
       })
       .expect(201);
 
     // Make mock return INSUFFICIENT_BALANCE for this employee
     await request(mockServer)
       .post('/admin/set-hcm-error')
-      .send({ employeeId: 'EMP-HCM-INS', locationId: 'LOC-1', code: 'INSUFFICIENT_BALANCE' })
+      .send({
+        employeeId: 'EMP-HCM-INS',
+        locationId: 'LOC-1',
+        code: 'INSUFFICIENT_BALANCE',
+      })
       .expect(200);
 
     await request(app.getHttpServer())
@@ -679,7 +757,14 @@ describe('AppController (e2e)', () => {
     await request(app.getHttpServer())
       .post('/leave/balances/batch')
       .send({
-        items: [{ employeeId: 'EMP-403', locationId: 'LOC-1', totalDays: 10, usedDays: 0 }]
+        items: [
+          {
+            employeeId: 'EMP-403',
+            locationId: 'LOC-1',
+            totalDays: 10,
+            usedDays: 0,
+          },
+        ],
       })
       .expect(201);
 
@@ -704,7 +789,7 @@ describe('AppController (e2e)', () => {
   it('24. Background sync failure coverage', async () => {
     const employeeId = 'EMP-SYNC-FAIL';
     const locationId = 'LOC-1';
-    
+
     // 1. Seed balance with old date
     await request(app.getHttpServer())
       .post('/leave/balances/batch')
@@ -712,10 +797,12 @@ describe('AppController (e2e)', () => {
       .expect(201);
 
     // Manually set lastSyncedAt to 1 hour ago
-    await dataSource.getRepository(LeaveBalance).update(
-      { employeeId, locationId },
-      { lastSyncedAt: new Date(Date.now() - 3600000) }
-    );
+    await dataSource
+      .getRepository(LeaveBalance)
+      .update(
+        { employeeId, locationId },
+        { lastSyncedAt: new Date(Date.now() - 3600000) },
+      );
 
     // Make mock fail for this employee
     await request(mockServer)
@@ -728,9 +815,9 @@ describe('AppController (e2e)', () => {
       .get('/leave/balances')
       .query({ employeeId, locationId })
       .expect(200);
-    
+
     // Small delay to let background task finish
-    await new Promise(resolve => setTimeout(resolve, 100));
+    await new Promise((resolve) => setTimeout(resolve, 100));
   });
 
   it('25. Restore balance failure coverage in reject/cancel', async () => {
@@ -745,7 +832,14 @@ describe('AppController (e2e)', () => {
 
     const createRes = await request(app.getHttpServer())
       .post('/leave/requests')
-      .send({ employeeId, locationId, startDate: '2026-10-01', endDate: '2026-10-02', daysRequested: 1, requestedBy: employeeId })
+      .send({
+        employeeId,
+        locationId,
+        startDate: '2026-10-01',
+        endDate: '2026-10-02',
+        daysRequested: 1,
+        requestedBy: employeeId,
+      })
       .expect(201);
     const reqId = createRes.body.id;
 
@@ -765,9 +859,14 @@ describe('AppController (e2e)', () => {
   it('26. Sync balance for non-existent local employee (init from HCM)', async () => {
     const employeeId = 'EMP-NEVER-SEEN';
     const locationId = 'LOC-1';
-    
+
     // Seed mock ONLY
-    mockBalances[`${employeeId}_${locationId}`] = { employeeId, locationId, totalDays: 30, usedDays: 5 };
+    mockBalances[`${employeeId}_${locationId}`] = {
+      employeeId,
+      locationId,
+      totalDays: 30,
+      usedDays: 5,
+    };
 
     await request(app.getHttpServer())
       .get('/leave/balances')
@@ -790,7 +889,14 @@ describe('AppController (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/leave/requests')
-      .send({ employeeId, locationId, startDate: '2026-10-01', endDate: '2026-10-02', daysRequested: 1, requestedBy: employeeId })
+      .send({
+        employeeId,
+        locationId,
+        startDate: '2026-10-01',
+        endDate: '2026-10-02',
+        daysRequested: 1,
+        requestedBy: employeeId,
+      })
       .expect(400);
   });
 
@@ -805,7 +911,14 @@ describe('AppController (e2e)', () => {
 
     const createRes = await request(app.getHttpServer())
       .post('/leave/requests')
-      .send({ employeeId, locationId, startDate: '2026-10-01', endDate: '2026-10-02', daysRequested: 1, requestedBy: employeeId })
+      .send({
+        employeeId,
+        locationId,
+        startDate: '2026-10-01',
+        endDate: '2026-10-02',
+        daysRequested: 1,
+        requestedBy: employeeId,
+      })
       .expect(201);
     const reqId = createRes.body.id;
 
@@ -821,13 +934,9 @@ describe('AppController (e2e)', () => {
   }, 10000);
 
   it('29. Coverage: Global exception filter raw error', async () => {
-    await request(app.getHttpServer())
-      .get('/health?error=1')
-      .expect(500);
-    
-    await request(app.getHttpServer())
-      .get('/health?error=2')
-      .expect(500);
+    await request(app.getHttpServer()).get('/health?error=1').expect(500);
+
+    await request(app.getHttpServer()).get('/health?error=2').expect(500);
   });
 
   it('30. LeaveService coverage: getBalance fail during requestTimeOff', async () => {
@@ -842,7 +951,14 @@ describe('AppController (e2e)', () => {
 
     await request(app.getHttpServer())
       .post('/leave/requests')
-      .send({ employeeId, locationId, startDate: '2026-10-01', endDate: '2026-10-02', daysRequested: 1, requestedBy: employeeId })
+      .send({
+        employeeId,
+        locationId,
+        startDate: '2026-10-01',
+        endDate: '2026-10-02',
+        daysRequested: 1,
+        requestedBy: employeeId,
+      })
       .expect(422); // Balance init to 0, then 1 > 0 fails
   }, 10000);
 
@@ -868,5 +984,41 @@ describe('AppController (e2e)', () => {
       .expect(200);
     expect(balRes.body.totalDays).toBe(20);
     expect(balRes.body.usedDays).toBe(5);
+  });
+
+  it('32. Coverage: approve request when local balance has been deleted', async () => {
+    const employeeId = 'EMP-NO-BAL';
+    const locationId = 'LOC-1';
+
+    // 1. Create a request
+    const resp = await request(app.getHttpServer())
+      .post('/leave/requests')
+      .send({
+        employeeId,
+        locationId,
+        startDate: '2026-01-01',
+        endDate: '2026-01-02',
+        daysRequested: 1,
+        requestedBy: employeeId,
+      })
+      .expect(201);
+
+    const reqId = resp.body.id;
+
+    // 2. Delete the balance from DB manually
+    await dataSource
+      .getRepository(LeaveBalance)
+      .delete({ employeeId, locationId });
+
+    // 3. Approve the request
+    await request(app.getHttpServer())
+      .patch(`/leave/requests/${reqId}/approve`)
+      .send({ managerId: 'MGR-1' })
+      .expect(200);
+
+    const updatedReq = await request(app.getHttpServer())
+      .get(`/leave/requests/${reqId}`)
+      .expect(200);
+    expect(updatedReq.body.status).toBe('APPROVED');
   });
 });

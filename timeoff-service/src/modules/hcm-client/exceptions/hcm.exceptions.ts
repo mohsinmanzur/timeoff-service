@@ -1,5 +1,9 @@
 export class HcmApiException extends Error {
-  constructor(message: string, public readonly status?: number, public readonly responseBody?: any) {
+  constructor(
+    message: string,
+    public readonly status?: number,
+    public readonly responseBody?: any,
+  ) {
     super(message);
     this.name = 'HcmApiException';
   }

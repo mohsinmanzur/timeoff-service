@@ -1,8 +1,21 @@
 import {
-  Controller, Post, Get, Patch, Delete,
-  Param, Query, Body,
+  Controller,
+  Post,
+  Get,
+  Patch,
+  Delete,
+  Param,
+  Query,
+  Body,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiQuery, ApiParam, ApiBody } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiQuery,
+  ApiParam,
+  ApiBody,
+} from '@nestjs/swagger';
 import { LeaveService } from './leave.service';
 import { HcmClientService } from '../hcm-client/hcm-client.service';
 import {
@@ -90,7 +103,10 @@ export class LeaveController {
   @ApiOperation({ summary: 'Get leave balance for an employee + location' })
   @ApiQuery({ name: 'employeeId', required: true, example: 'EMP-001' })
   @ApiQuery({ name: 'locationId', required: true, example: 'LOC-NYC' })
-  @ApiResponse({ status: 200, description: 'Balance data (served from local cache)' })
+  @ApiResponse({
+    status: 200,
+    description: 'Balance data (served from local cache)',
+  })
   async getBalance(
     @Query('employeeId') employeeId: string,
     @Query('locationId') locationId: string,
@@ -111,7 +127,7 @@ export class LeaveController {
   @ApiOperation({ summary: 'Ingest a batch balance payload from HCM' })
   @ApiResponse({ status: 200, description: 'Batch ingested successfully' })
   async ingestBatch(@Body() dto: { items: HcmBatchItemDto[] }) {
-    const payload: HcmBatchPayloadDto[] = dto.items.map(item => ({
+    const payload: HcmBatchPayloadDto[] = dto.items.map((item) => ({
       employeeId: item.employeeId,
       locationId: item.locationId,
       availableDays: item.totalDays - item.usedDays,

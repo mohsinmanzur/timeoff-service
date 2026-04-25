@@ -11,7 +11,7 @@ export class AppController {
       throw new Error('Test error');
     }
     if (error === '2') {
-      throw 'String error';
+      throw new Error('String error');
     }
     return {
       status: 'ok',

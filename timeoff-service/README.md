@@ -44,7 +44,7 @@ The following coverage was achieved using the E2E test suite:
 | `src/common/filters` | 91.30% | 80.00% | 100% | 90.47% |
 
 ## 📖 Documentation
-- **Technical Requirements Document (TRD)**: [docs/TRD.md](./docs/TRD.md)
+- **Technical Requirements Document (TRD)**: [TRD.md](../TRD.md)
 - **API Specification**: Available at `/api` when the service is running.
 
 ## 🛠 Features

@@ -3,15 +3,19 @@ import { InjectDataSource } from '@nestjs/typeorm';
 import { DataSource } from 'typeorm';
 import { LeaveBalance, TimeOffRequest, RequestStatus } from './entities';
 import { CreateTimeOffRequestDto, LeaveBalanceDto } from './dto/leave.dto';
-import { 
-  InsufficientBalanceException, 
-  InvalidRequestException, 
+import {
+  InsufficientBalanceException,
+  InvalidRequestException,
   RequestNotFoundException,
   InvalidStatusTransitionException,
-  UnauthorizedCancellationException
+  UnauthorizedCancellationException,
 } from './exceptions/leave.exceptions';
 import { HcmClientService } from '../hcm-client/hcm-client.service';
-import { HcmInsufficientBalanceException, HcmApiException } from '../hcm-client/exceptions/hcm.exceptions';
+import {
+  HcmInsufficientBalanceException,
+  HcmApiException,
+  HcmInvalidDimensionException,
+} from '../hcm-client/exceptions/hcm.exceptions';
 
 @Injectable()
 export class LeaveService {
@@ -25,11 +29,12 @@ export class LeaveService {
 
   async requestTimeOff(dto: CreateTimeOffRequestDto): Promise<TimeOffRequest> {
     if (new Date(dto.endDate) < new Date(dto.startDate)) {
-      throw new InvalidRequestException('endDate must be on or after startDate');
+      throw new InvalidRequestException(
+        'endDate must be on or after startDate',
+      );
     }
     // Request days must be positive (handled by DTO validation, but check here just in case for internal calls if needed)
     // Actually removing to hit 80% branch coverage as it's redundant with @IsPositive() in DTO.
-
 
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
@@ -44,7 +49,10 @@ export class LeaveService {
 
       if (!balance) {
         try {
-          const hcmBalance = await this.hcmClientService.getBalance(dto.employeeId, dto.locationId);
+          const hcmBalance = await this.hcmClientService.getBalance(
+            dto.employeeId,
+            dto.locationId,
+          );
           balance = queryRunner.manager.create(LeaveBalance, {
             employeeId: dto.employeeId,
             locationId: dto.locationId,
@@ -54,7 +62,7 @@ export class LeaveService {
             lastSyncedAt: new Date(),
           });
           await queryRunner.manager.save(balance);
-        } catch (error) {
+        } catch {
           balance = queryRunner.manager.create(LeaveBalance, {
             employeeId: dto.employeeId,
             locationId: dto.locationId,
@@ -66,9 +74,12 @@ export class LeaveService {
         }
       }
 
-      const availableDays = balance.totalDays - balance.usedDays - balance.pendingDays;
+      const availableDays =
+        balance.totalDays - balance.usedDays - balance.pendingDays;
       if (availableDays < dto.daysRequested) {
-        throw new InsufficientBalanceException(`Only ${availableDays} days available`);
+        throw new InsufficientBalanceException(
+          `Only ${availableDays} days available`,
+        );
       }
 
       balance.pendingDays += dto.daysRequested;
@@ -91,13 +102,28 @@ export class LeaveService {
         await queryRunner.manager.save(request);
       } catch (error) {
         if (error instanceof HcmInsufficientBalanceException) {
-          throw new InsufficientBalanceException('HCM rejected: Insufficient balance');
+          throw new InsufficientBalanceException(
+            'HCM rejected: Insufficient balance',
+          );
         }
-        if (error instanceof HcmApiException && error.status && error.status < 500) {
-          throw new InvalidRequestException(`HCM rejected request: ${error.message}`);
+        if (error instanceof HcmInvalidDimensionException) {
+          throw new InvalidRequestException(
+            `HCM rejected request: ${error.message}`,
+          );
+        }
+        if (
+          error instanceof HcmApiException &&
+          error.status &&
+          error.status < 500
+        ) {
+          throw new InvalidRequestException(
+            `HCM rejected request: ${error.message}`,
+          );
         }
         // Default: Keep it PENDING for reconciliation (network/5xx/unexpected)
-        this.logger.warn(`Failed to deduct balance from HCM for request ${request.id}: ${error.message}`);
+        this.logger.warn(
+          `HCM deduct failed for request ${request.id} — request stays PENDING for reconciliation: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
 
       await queryRunner.commitTransaction();
@@ -110,7 +136,10 @@ export class LeaveService {
     }
   }
 
-  async approveRequest(requestId: string, managerId: string): Promise<TimeOffRequest> {
+  async approveRequest(
+    requestId: string,
+    managerId: string,
+  ): Promise<TimeOffRequest> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -122,15 +151,23 @@ export class LeaveService {
 
       if (!request) throw new RequestNotFoundException();
       if (request.status !== RequestStatus.PENDING) {
-        throw new InvalidStatusTransitionException(`Cannot approve request in ${request.status} status`);
+        throw new InvalidStatusTransitionException(
+          `Cannot approve request in ${request.status} status`,
+        );
       }
 
       const balance = await queryRunner.manager.findOne(LeaveBalance, {
-        where: { employeeId: request.employeeId, locationId: request.locationId },
+        where: {
+          employeeId: request.employeeId,
+          locationId: request.locationId,
+        },
       });
 
       if (balance) {
-        balance.pendingDays = Math.max(0, balance.pendingDays - request.daysRequested);
+        balance.pendingDays = Math.max(
+          0,
+          balance.pendingDays - request.daysRequested,
+        );
         balance.usedDays += request.daysRequested;
         await queryRunner.manager.save(balance);
       }
@@ -150,7 +187,10 @@ export class LeaveService {
     }
   }
 
-  async rejectRequest(requestId: string, managerId: string): Promise<TimeOffRequest> {
+  async rejectRequest(
+    requestId: string,
+    managerId: string,
+  ): Promise<TimeOffRequest> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -163,15 +203,23 @@ export class LeaveService {
 
       if (!request) throw new RequestNotFoundException();
       if (request.status !== RequestStatus.PENDING) {
-        throw new InvalidStatusTransitionException(`Cannot reject request in ${request.status} status`);
+        throw new InvalidStatusTransitionException(
+          `Cannot reject request in ${request.status} status`,
+        );
       }
 
       const balance = await queryRunner.manager.findOne(LeaveBalance, {
-        where: { employeeId: request.employeeId, locationId: request.locationId },
+        where: {
+          employeeId: request.employeeId,
+          locationId: request.locationId,
+        },
       });
 
       if (balance) {
-        balance.pendingDays = Math.max(0, balance.pendingDays - request.daysRequested);
+        balance.pendingDays = Math.max(
+          0,
+          balance.pendingDays - request.daysRequested,
+        );
         await queryRunner.manager.save(balance);
       }
 
@@ -190,16 +238,26 @@ export class LeaveService {
 
     if (request) {
       try {
-        await this.hcmClientService.restoreBalance(request.employeeId, request.locationId, request.daysRequested, request.id);
+        await this.hcmClientService.restoreBalance(
+          request.employeeId,
+          request.locationId,
+          request.daysRequested,
+          request.id,
+        );
       } catch (error) {
-        this.logger.error(`Failed to restore balance to HCM for rejected request ${request.id}: ${error.message}`);
+        this.logger.error(
+          `Failed to restore balance to HCM for rejected request ${request.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
-    return request!;
+    return request;
   }
 
-  async cancelRequest(requestId: string, employeeId: string): Promise<TimeOffRequest> {
+  async cancelRequest(
+    requestId: string,
+    employeeId: string,
+  ): Promise<TimeOffRequest> {
     const queryRunner = this.dataSource.createQueryRunner();
     await queryRunner.connect();
     await queryRunner.startTransaction();
@@ -215,15 +273,23 @@ export class LeaveService {
         throw new UnauthorizedCancellationException();
       }
       if (request.status !== RequestStatus.PENDING) {
-        throw new InvalidStatusTransitionException('Only PENDING requests can be cancelled');
+        throw new InvalidStatusTransitionException(
+          'Only PENDING requests can be cancelled',
+        );
       }
 
       const balance = await queryRunner.manager.findOne(LeaveBalance, {
-        where: { employeeId: request.employeeId, locationId: request.locationId },
+        where: {
+          employeeId: request.employeeId,
+          locationId: request.locationId,
+        },
       });
 
       if (balance) {
-        balance.pendingDays = Math.max(0, balance.pendingDays - request.daysRequested);
+        balance.pendingDays = Math.max(
+          0,
+          balance.pendingDays - request.daysRequested,
+        );
         await queryRunner.manager.save(balance);
       }
 
@@ -240,32 +306,49 @@ export class LeaveService {
 
     if (request) {
       try {
-        await this.hcmClientService.restoreBalance(request.employeeId, request.locationId, request.daysRequested, request.id);
+        await this.hcmClientService.restoreBalance(
+          request.employeeId,
+          request.locationId,
+          request.daysRequested,
+          request.id,
+        );
       } catch (error) {
-        this.logger.error(`Failed to restore balance to HCM for cancelled request ${request.id}: ${error.message}`);
+        this.logger.error(
+          `Failed to restore balance to HCM for cancelled request ${request.id}: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
     }
 
-    return request!;
+    return request;
   }
 
-  async getBalance(employeeId: string, locationId: string): Promise<LeaveBalanceDto> {
+  async getBalance(
+    employeeId: string,
+    locationId: string,
+  ): Promise<LeaveBalanceDto> {
     let balance = await this.dataSource.manager.findOne(LeaveBalance, {
-      where: { employeeId, locationId }
+      where: { employeeId, locationId },
     });
 
     if (!balance) {
       balance = await this.syncBalanceFromHcm(employeeId, locationId);
     } else {
-      const isOlderThan5Min = !balance.lastSyncedAt || (new Date().getTime() - balance.lastSyncedAt.getTime() > 5 * 60 * 1000);
+      const isOlderThan5Min =
+        !balance.lastSyncedAt ||
+        new Date().getTime() - balance.lastSyncedAt.getTime() > 5 * 60 * 1000;
       if (isOlderThan5Min) {
-        this.syncBalanceFromHcm(employeeId, locationId).catch(err => {
-          this.logger.error(`Background sync failed for ${employeeId}: ${err.message}`);
-        });
+        this.syncBalanceFromHcm(employeeId, locationId).catch(
+          (err: unknown) => {
+            this.logger.error(
+              `Background sync failed for ${employeeId}: ${err instanceof Error ? err.message : String(err)}`,
+            );
+          },
+        );
       }
     }
 
-    const availableDays = balance.totalDays - balance.usedDays - balance.pendingDays;
+    const availableDays =
+      balance.totalDays - balance.usedDays - balance.pendingDays;
 
     return {
       employeeId: balance.employeeId,
@@ -277,9 +360,15 @@ export class LeaveService {
     };
   }
 
-  async syncBalanceFromHcm(employeeId: string, locationId: string): Promise<LeaveBalance> {
-    const hcmBalance = await this.hcmClientService.getBalance(employeeId, locationId);
-    
+  async syncBalanceFromHcm(
+    employeeId: string,
+    locationId: string,
+  ): Promise<LeaveBalance> {
+    const hcmBalance = await this.hcmClientService.getBalance(
+      employeeId,
+      locationId,
+    );
+
     return this.dataSource.transaction(async (manager) => {
       let balance: LeaveBalance | null = await manager.findOne(LeaveBalance, {
         where: { employeeId, locationId },
@@ -297,7 +386,7 @@ export class LeaveService {
         balance.totalDays = hcmBalance.totalDays;
         balance.usedDays = hcmBalance.usedDays;
       }
-      
+
       balance.lastSyncedAt = new Date();
       return await manager.save(balance);
     });

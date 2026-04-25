@@ -11,7 +11,9 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
         const isTest = process.env.NODE_ENV === 'test';
         return {
           type: 'sqlite',
-          database: isTest ? ':memory:' : configService.get<string>('DB_PATH', './data/timeoff.db'),
+          database: isTest
+            ? ':memory:'
+            : configService.get<string>('DB_PATH', './data/timeoff.db'),
           synchronize: true,
           autoLoadEntities: true,
         };

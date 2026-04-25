@@ -15,4 +15,3 @@ import { HcmClientModule } from '../hcm-client/hcm-client.module';
   exports: [LeaveService],
 })
 export class LeaveModule {}
-

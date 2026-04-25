@@ -1,4 +1,11 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import { Request, Response } from 'express';
 import { HcmApiException } from '../../modules/hcm-client/exceptions/hcm.exceptions';
 
@@ -14,23 +21,51 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let status: number;
     let message: string;
 
-    if (exception instanceof HcmApiException || (exception as any)?.constructor?.name === 'HcmApiException') {
+    if (
+      exception instanceof HcmApiException ||
+      (exception as { constructor?: { name?: string } })?.constructor?.name ===
+        'HcmApiException'
+    ) {
       status = HttpStatus.BAD_GATEWAY;
-      const msg = (exception as any).message;
-      message = msg?.startsWith('HCM service error') ? msg : `HCM service error: ${msg}`;
+      const hcmEx = exception as { message?: string };
+      const rawMsg = hcmEx.message ?? '';
+      message = rawMsg.startsWith('HCM service error')
+        ? rawMsg
+        : `HCM service error: ${rawMsg}`;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
-      message = typeof res === 'string' ? res : (res as any).message ?? exception.message;
+      if (typeof res === 'string') {
+        message = res;
+      } else {
+        const resObj = res as { message?: string };
+        message = resObj.message ?? exception.message;
+      }
     } else if (exception instanceof Error) {
-      status = HttpStatus.INTERNAL_SERVER_ERROR;
-      message = exception.message;
+      // Detect upstream HCM 5xx failures propagated as AxiosError
+      const axiosErr = exception as {
+        isAxiosError?: boolean;
+        response?: { status?: number };
+      };
+      if (
+        axiosErr.isAxiosError &&
+        axiosErr.response?.status &&
+        axiosErr.response.status >= 500
+      ) {
+        status = HttpStatus.BAD_GATEWAY;
+        message = `HCM service error: ${exception.message}`;
+      } else {
+        status = HttpStatus.INTERNAL_SERVER_ERROR;
+        message = exception.message;
+      }
     } else {
       status = HttpStatus.INTERNAL_SERVER_ERROR;
       message = 'Internal server error';
     }
 
-    this.logger.error(`[${request.method}] ${request.url} → ${status}: ${message}`);
+    this.logger.error(
+      `[${request.method}] ${request.url} → ${status}: ${message}`,
+    );
 
     response.status(status).json({
       statusCode: status,

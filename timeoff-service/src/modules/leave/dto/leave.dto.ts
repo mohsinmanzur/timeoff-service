@@ -1,5 +1,11 @@
-import { IsString, IsNotEmpty, IsDateString, IsNumber, IsPositive, IsOptional } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import {
+  IsString,
+  IsNotEmpty,
+  IsDateString,
+  IsNumber,
+  IsPositive,
+} from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export class CreateTimeOffRequestDto {
   @ApiProperty({ example: 'EMP-001' })
