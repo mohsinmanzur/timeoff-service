@@ -34,6 +34,10 @@ export class BalanceService {
     return balance;
   }
 
+  async getAllBalances(): Promise<HcmBalance[]> {
+    return this.balanceRepository.find({ order: { employeeId: 'ASC', locationId: 'ASC' } });
+  }
+
   async deductBalance(dto: DeductBalanceDto, simulateError = false): Promise<{ success: boolean; remainingBalance: number; hcmReference: string }> {
     if (simulateError) {
       throw new InternalServerErrorException({ code: 'HCM_INTERNAL_ERROR', message: 'Simulated failure' });

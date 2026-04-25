@@ -9,6 +9,13 @@ import { RestoreBalanceDto } from './dto/restore-balance.dto';
 export class BalanceController {
   constructor(private readonly balanceService: BalanceService) {}
 
+  @Get('all')
+  @ApiOperation({ summary: 'List all HCM leave balances across all employees and locations' })
+  @ApiResponse({ status: 200, description: 'Full balance list returned' })
+  async getAllBalances() {
+    return this.balanceService.getAllBalances();
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get leave balance for an employee + location' })
   @ApiQuery({ name: 'employeeId', required: true, example: 'EMP-001' })
