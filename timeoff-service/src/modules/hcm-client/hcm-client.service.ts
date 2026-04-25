@@ -67,17 +67,12 @@ export class HcmClientService {
   }
 
   private isNetworkError(error: any): boolean {
-    if (error instanceof AxiosError) {
-      if (!error.response) return true; // Network error, timeout, etc.
-      if (error.response.status >= 500) return true; // Server error
-      return false; // 4xx errors are not retried
-    }
-    return false;
+    return (error instanceof AxiosError) && (!error.response || error.response.status >= 500);
   }
 
   async getBalance(employeeId: string, locationId: string): Promise<HcmBalanceDto> {
-    return this.requestWithRetry(async () => {
-      try {
+    try {
+      return await this.requestWithRetry(async () => {
         const response = await lastValueFrom(
           this.httpService.get<HcmBalanceDto>(`${this.baseUrl}/balances`, {
             headers: this.headers,
@@ -85,15 +80,15 @@ export class HcmClientService {
           })
         );
         return response.data;
-      } catch (error) {
-        this.handleHcmError(error);
-      }
-    });
+      });
+    } catch (error) {
+      this.handleHcmError(error);
+    }
   }
 
   async deductBalance(employeeId: string, locationId: string, days: number, requestId: string): Promise<HcmDeductResponseDto> {
-    return this.requestWithRetry(async () => {
-      try {
+    try {
+      return await this.requestWithRetry(async () => {
         const response = await lastValueFrom(
           this.httpService.post<HcmDeductResponseDto>(
             `${this.baseUrl}/balances/deduct`,
@@ -102,15 +97,15 @@ export class HcmClientService {
           )
         );
         return response.data;
-      } catch (error) {
-        this.handleHcmError(error);
-      }
-    });
+      });
+    } catch (error) {
+      this.handleHcmError(error);
+    }
   }
 
   async restoreBalance(employeeId: string, locationId: string, days: number, requestId: string): Promise<void> {
-    return this.requestWithRetry(async () => {
-      try {
+    try {
+      await this.requestWithRetry(async () => {
         await lastValueFrom(
           this.httpService.post(
             `${this.baseUrl}/balances/restore`,
@@ -118,46 +113,39 @@ export class HcmClientService {
             { headers: this.headers }
           )
         );
-      } catch (error) {
-        this.handleHcmError(error);
-      }
-    });
+      });
+    } catch (error) {
+      this.handleHcmError(error);
+    }
   }
 
   async ingestBatch(payload: HcmBatchPayloadDto[]): Promise<void> {
     for (const record of payload) {
-      let balance = await this.leaveBalanceRepo.findOne({
+      const balance = await this.leaveBalanceRepo.findOne({
         where: { employeeId: record.employeeId, locationId: record.locationId }
+      }) || this.leaveBalanceRepo.create({
+        employeeId: record.employeeId,
+        locationId: record.locationId,
       });
-      if (!balance) {
-        balance = this.leaveBalanceRepo.create({
-          employeeId: record.employeeId,
-          locationId: record.locationId,
-          totalDays: record.availableDays + record.usedDays,
-          usedDays: record.usedDays,
-        });
-      } else {
-        balance.totalDays = record.availableDays + record.usedDays;
-        balance.usedDays = record.usedDays;
-      }
+
+      balance.totalDays = record.availableDays + record.usedDays;
+      balance.usedDays = record.usedDays;
       balance.lastSyncedAt = new Date();
       await this.leaveBalanceRepo.save(balance);
     }
   }
 
   private handleHcmError(error: any): never {
-    if (error instanceof AxiosError) {
-      const response = error.response;
-      if (response && response.status >= 400 && response.status < 500) {
-        const errorCode = response.data?.code || response.data?.error;
-        if (errorCode === 'INSUFFICIENT_BALANCE') {
-          throw new HcmInsufficientBalanceException(response.data?.message || 'Insufficient balance');
-        }
-        if (errorCode === 'INVALID_DIMENSION') {
-          throw new HcmInvalidDimensionException(response.data?.message || 'Invalid dimension');
-        }
+    const response = (error instanceof AxiosError) ? error.response : null;
+    if (response && response.status >= 400 && response.status < 500) {
+      const errorCode = response.data?.code || response.data?.error;
+      if (errorCode === 'INSUFFICIENT_BALANCE') {
+        throw new HcmInsufficientBalanceException(response.data?.message || 'Insufficient balance');
       }
-      throw new HcmApiException(error.message, response?.status, response?.data);
+      if (errorCode === 'INVALID_DIMENSION') {
+        throw new HcmInvalidDimensionException(response.data?.message || 'Invalid dimension');
+      }
+      throw new HcmApiException(error.message, response.status, response.data);
     }
     throw error;
   }

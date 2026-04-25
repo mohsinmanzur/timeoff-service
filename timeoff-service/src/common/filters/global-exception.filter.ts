@@ -14,9 +14,10 @@ export class GlobalExceptionFilter implements ExceptionFilter {
     let status: number;
     let message: string;
 
-    if (exception instanceof HcmApiException) {
+    if (exception instanceof HcmApiException || (exception as any)?.constructor?.name === 'HcmApiException') {
       status = HttpStatus.BAD_GATEWAY;
-      message = `HCM service error: ${exception.message}`;
+      const msg = (exception as any).message;
+      message = msg?.startsWith('HCM service error') ? msg : `HCM service error: ${msg}`;
     } else if (exception instanceof HttpException) {
       status = exception.getStatus();
       const res = exception.getResponse();
