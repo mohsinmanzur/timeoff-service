@@ -1,4 +1,29 @@
-node_modules/
+# compiled output
 dist/
+build/
+*.js
+*.js.map
+!check.js
+!jest.config.js
+!eslint.config.mjs
+
+# dependencies
+node_modules/
+
+# database
 data/
+*.db
+*.sqlite
+
+# env
 .env
+
+# IDEs and OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.log
+
+# Example files should not be ignored
+!.env.example
