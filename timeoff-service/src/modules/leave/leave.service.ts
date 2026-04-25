@@ -40,7 +40,6 @@ export class LeaveService {
     try {
       let balance = await queryRunner.manager.findOne(LeaveBalance, {
         where: { employeeId: dto.employeeId, locationId: dto.locationId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (!balance) {
@@ -117,7 +116,6 @@ export class LeaveService {
     try {
       const request = await queryRunner.manager.findOne(TimeOffRequest, {
         where: { id: requestId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (!request) throw new RequestNotFoundException();
@@ -127,7 +125,6 @@ export class LeaveService {
 
       const balance = await queryRunner.manager.findOne(LeaveBalance, {
         where: { employeeId: request.employeeId, locationId: request.locationId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (balance) {
@@ -160,7 +157,6 @@ export class LeaveService {
     try {
       request = await queryRunner.manager.findOne(TimeOffRequest, {
         where: { id: requestId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (!request) throw new RequestNotFoundException();
@@ -170,7 +166,6 @@ export class LeaveService {
 
       const balance = await queryRunner.manager.findOne(LeaveBalance, {
         where: { employeeId: request.employeeId, locationId: request.locationId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (balance) {
@@ -211,7 +206,6 @@ export class LeaveService {
     try {
       request = await queryRunner.manager.findOne(TimeOffRequest, {
         where: { id: requestId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (!request) throw new RequestNotFoundException();
@@ -224,7 +218,6 @@ export class LeaveService {
 
       const balance = await queryRunner.manager.findOne(LeaveBalance, {
         where: { employeeId: request.employeeId, locationId: request.locationId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (balance) {
@@ -288,7 +281,6 @@ export class LeaveService {
     return this.dataSource.transaction(async (manager) => {
       let balance: LeaveBalance | null = await manager.findOne(LeaveBalance, {
         where: { employeeId, locationId },
-        lock: { mode: 'pessimistic_write' },
       });
 
       if (!balance) {

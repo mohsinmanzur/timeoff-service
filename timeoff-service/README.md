@@ -1,21 +1,57 @@
-# timeoff-service
-
-ExampleHR TimeOff Microservice.
+# Time-Off Service (Primary Application)
 
 ## Description
-This is a NestJS microservice responsible for the full lifecycle of employee time-off requests within the ExampleHR platform. It acts as an orchestration layer between employee-facing product surfaces and an authoritative external Human Capital Management (HCM) system.
+The **Time-Off Service** is the main application in this repository. It manages the full lifecycle of employee time-off requests, serving as the central orchestration layer for leave management.
 
-## How to run locally
-1. Install dependencies: `npm install`
-2. Create `.env` from `.env.example`
-3. Run the application: `npm run start:dev`
+## Key Features
+- **Leave Lifecycle Management**: Handles creation, approval, rejection, and cancellation of requests.
+- **External Integration**: Programmatically synchronizes with a Human Capital Management (HCM) system.
+- **Strict Validation**: Enforces business rules, such as preventing requests that exceed available leave balances.
+- **Atomic Operations**: Ensures data consistency between the local service and the external HCM system.
 
-## How to run tests
-- Unit tests: `npm run test`
-- E2E tests: `npm run test:e2e`
+## How it works
+The service maintains its own record of time-off requests while treating an external HCM system (simulated by the `hcm-service` in this repo) as the authoritative source of truth for leave balances. When a request is processed, the service performs a two-way synchronization to ensure both systems remain in sync.
 
-## Environment Variables
-- `DB_PATH`: Path to the SQLite database file (default: `./data/timeoff.db`)
-- `HCM_BASE_URL`: Base URL for the HCM API
-- `HCM_API_KEY`: API key for the HCM API
-- `PORT`: Port the service listens on (default: 3000)
+## Project Setup
+
+### Installation
+```bash
+$ npm install
+```
+
+### Environment Configuration
+Create a `.env` file from `.env.example`:
+```bash
+$ cp .env.example .env
+```
+Default configuration:
+- `DB_PATH`: `./data/timeoff.db`
+- `HCM_BASE_URL`: `http://localhost:3001` (Points to the placeholder HCM service)
+- `PORT`: `3000`
+
+## Running the App
+
+```bash
+# development mode with hot-reload
+$ npm run start:dev
+```
+
+## Running Tests
+This project includes extensive test coverage to ensure the reliability of the leave management logic.
+
+```bash
+# unit tests
+$ npm run test
+
+# integration tests (Requires hcm-service)
+$ npm run test:integration
+
+# e2e tests
+$ npm run test:e2e
+```
+
+## Tech Stack
+- **Framework**: [NestJS](https://nestjs.com/)
+- **ORM**: [TypeORM](https://typeorm.io/)
+- **Database**: [SQLite](https://www.sqlite.org/)
+- **API Documentation**: Swagger (available at `/api`)
